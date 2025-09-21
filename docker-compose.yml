@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: l2-challenge-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chaves_db
+      POSTGRES_USER: chaves_user
+      POSTGRES_PASSWORD: chaves_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - chaves-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chaves_user -d chaves_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: l2-challenge-api
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: chaves_user
+      DB_PASSWORD: chaves_password
+      DB_NAME: chaves_db
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - chaves-network
+    volumes:
+      - ./src:/app/src
+      - ./package.json:/app/package.json
+      - ./yarn.lock:/app/yarn.lock
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./nest-cli.json:/app/nest-cli.json
+
+volumes:
+  postgres_data:
+
+networks:
+  chaves-network:
+    driver: bridge
